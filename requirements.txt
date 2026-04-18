@@ -1,1 +1,4 @@
-
+requests
+pandas
+psycopg2-binary
+websocket-client
