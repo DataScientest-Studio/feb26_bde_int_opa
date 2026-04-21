@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS historical_klines_15m (
 )
 """)
 
-query = f"""INSERT INTO historical_klines_15m ({",".join(cols)}) VALUES %s"""
+query = f"""INSERT INTO historical_klines_15m ({",".join(cols)}) VALUES %s ON CONFLICT (open_time) DO NOTHING"""
 
 execute_values(cur, query, df.values.tolist())
 
