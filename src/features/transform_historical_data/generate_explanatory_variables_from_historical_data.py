@@ -1,8 +1,36 @@
 import pandas as pd
+import psycopg2
+import os
+import logging
+from psycopg2.extras import execute_values
 
-df = pd.read_csv('BTCUSDT_15m_3years.csv')
+
+########### make connection to SQL DB and read in historical data ############
+
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT"),
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD")
+}
+
+conn = psycopg2.connect(connect_timeout=5, **DB_CONFIG)
+conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+cur = conn.cursor()
+
+logging.info("Connected to database")
+
+df = pd.read_sql_query("SELECT * FROM historical_klines_15m", conn)
+
+################## transform the raw historical data to extract explanatory variables #####################
 
 feats = pd.DataFrame()
+
+################### open time ###################
+
+feats['open_time'] = pd.to_datetime(df['open_time'], unit='ms', utc=True)
 
 ################### Basic price features ###################
 # Candle body and range
@@ -77,19 +105,68 @@ feats['trade_decision'] = 0  # default Hold
 feats.loc[feats['future_return'] > threshold, 'trade_decision'] = 1   # Buy
 feats.loc[feats['future_return'] < -threshold, 'trade_decision'] = -1 # Sell
 
-######## ADD CLEANING STEPS ########
+#################### Save the transformed data into SQL Database #########################
 
-# Drop rows where future_close is NaN (at the end of the dataset)
-#feats = feats.dropna(subset=['future_close', 'future_return'])
+cur.execute("""
+        CREATE TABLE IF NOT EXISTS historical_klines_15m_features (
+                open_time TIMESTAMPTZ PRIMARY KEY,
+                -- Price structure
+                candle_body DOUBLE PRECISION,
+                candle_range DOUBLE PRECISION,
+                upper_shadow DOUBLE PRECISION,
+                lower_shadow DOUBLE PRECISION,
 
+                -- Returns & momentum
+                return_1 DOUBLE PRECISION,
+                return_3 DOUBLE PRECISION,
+                return_5 DOUBLE PRECISION,
+                momentum_5 DOUBLE PRECISION,
+                momentum_10 DOUBLE PRECISION,
 
-features = [col for col in feats.columns if col not in ['future_close','future_return','trade_decision']]
+                -- Moving averages
+                ma5 DOUBLE PRECISION,
+                ma10 DOUBLE PRECISION,
+                ma20 DOUBLE PRECISION,
+                ma50 DOUBLE PRECISION,
+                ema5 DOUBLE PRECISION,
+                ema10 DOUBLE PRECISION,
+                ema20 DOUBLE PRECISION,
 
-ml_df = pd.DataFrame(columns=features + ['trade_decision']) 
-ml_df[features] = feats[features]
-ml_df['trade_decision'] = feats['trade_decision']
+                -- Volatility
+                volatility_5 DOUBLE PRECISION,
+                volatility_10 DOUBLE PRECISION,
+                volatility_20 DOUBLE PRECISION,
+                tr DOUBLE PRECISION,
+                atr_14 DOUBLE PRECISION,
 
-ml_df.to_csv("BTCUSDT_15m_ML_ready.csv", index=False)
+                -- Volume features
+                vol_change DOUBLE PRECISION,
+                vol_ma5 DOUBLE PRECISION,
+                vol_ma10 DOUBLE PRECISION,
+                vol_ma20 DOUBLE PRECISION,
 
-print("ML-ready dataset saved as BTCUSDT_15m_ml_ready.csv")
+                -- Trend strength
+                ma_diff_5_20 DOUBLE PRECISION,
+                ma_diff_10_50 DOUBLE PRECISION,
+                close_vs_ma20 DOUBLE PRECISION,
+                close_vs_ma50 DOUBLE PRECISION,
 
+                -- Targets
+                future_close DOUBLE PRECISION,
+                future_return DOUBLE PRECISION,
+                trade_decision INT
+                );
+    """)
+
+cols = list(feats.columns)
+    
+query = f"""INSERT INTO historical_klines_15m_features ({",".join(cols)}) VALUES %s"""
+
+execute_values(cur, query, feats.values.tolist())
+
+conn.commit()
+logging.info("Inserted transformed features into database")
+
+cur.close()
+conn.close()
+logging.info("Database connection closed")
