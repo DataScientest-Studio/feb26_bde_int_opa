@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres_binance_historical_data
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: binance_15m_klines_historical_data
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/data/init_historical_data_SQL_DB:/docker-entrypoint-initdb.d/
+    networks:
+      - binance_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  historical-data-loader:
+    image: raedayadi/extract_load_historical_data:v1.0
+    container_name: historical_data_loader
+    environment:
+      DB_HOST: postgres_binance_historical_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_historical_data
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  feature-engineering:
+    image: raedayadi/transform_historical_data:v1.0
+    container_name: feature_engineering_historical_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      historical-data-loader:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST: postgres_binance_historical_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_historical_data
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net   
+    restart: "no"
+
+volumes:
+  pgdata:
+
+networks:
+  binance_net:
+    driver: bridge
