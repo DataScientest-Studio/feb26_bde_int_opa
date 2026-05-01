@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src/ ./src/
 
 # -------- Run feature engine --------
-CMD ["python3", "src/features/feature_engine/generate_explanatory_variables_from_streaming_data.py"]
+CMD ["python3", "src/features/transform_live_data/generate_explanatory_variables_from_streaming_data.py"]

@@ -172,6 +172,7 @@ def rebuild_feature_table(conn, features):
     conn.commit()
 
 while True:
+    select.select([conn], [], [])
     conn.poll()
 
     while conn.notifies:
@@ -179,10 +180,12 @@ while True:
         logging.info(f"Trigger received: {notify.payload}")
 
         df = pd.read_sql(
-            "SELECT * FROM klines_15m ORDER BY open_time DESC LIMIT 60",
+            "SELECT * FROM klines_15m ORDER BY open_time DESC LIMIT 100",
             conn
         )
-
+        
+        df = df.sort_values('open_time')  # Ensure data is in chronological order
+        
         features = compute_features(df)
 
         rebuild_feature_table(conn, features)
