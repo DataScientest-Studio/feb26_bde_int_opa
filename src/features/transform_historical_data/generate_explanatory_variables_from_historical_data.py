@@ -160,7 +160,12 @@ cur.execute("""
 
 cols = list(feats.columns)
     
-query = f"""INSERT INTO historical_klines_15m_features ({",".join(cols)}) VALUES %s"""
+query = f"""
+INSERT INTO historical_klines_15m_features ({",".join(cols)})
+VALUES %s
+ON CONFLICT (open_time) DO UPDATE SET
+{", ".join([f"{col}=EXCLUDED.{col}" for col in cols if col != "open_time"])}
+"""
 
 execute_values(cur, query, feats.values.tolist())
 

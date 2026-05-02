@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: binance_15m_klines_historical_data
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_historical:/var/lib/postgresql/data
       - ./src/data/init_historical_data_SQL_DB:/docker-entrypoint-initdb.d/
     networks:
       - binance_net
@@ -52,8 +52,26 @@ services:
       - binance_net   
     restart: "no"
 
+  ML-training:
+    image: raedayadi/ml-training:v1.0
+    container_name: ML_training
+    environment:
+      DB_HOST: postgres_binance_historical_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_historical_data
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net
+    restart: "no"
+    depends_on:
+      feature-engineering:
+        condition: service_completed_successfully
+    volumes:
+      - ./src/models:/models
+
 volumes:
-  pgdata:
+  pgdata_historical:
 
 networks:
   binance_net:
