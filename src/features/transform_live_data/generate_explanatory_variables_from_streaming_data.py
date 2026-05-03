@@ -13,15 +13,6 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWORD")
 }
 
-conn = psycopg2.connect(connect_timeout=5, **DB_CONFIG)
-
-conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-
-cur = conn.cursor()
-cur.execute("LISTEN kline_update;")
-
-logging.info("Listening for updates...")
-
 def compute_features(df):
     feats = pd.DataFrame()
 
@@ -168,8 +159,30 @@ def rebuild_feature_table(conn, features):
         VALUES %s
     """
     execute_values(cur, query, features.values.tolist())
+    cur.execute("NOTIFY new_feature_table;")  # Notify that new features are available
+    logging.info("Feature table rebuilt and new features inserted successfully")
 
-    conn.commit()
+## Establish connection and listen for updates to generate features from streaming data
+conn = psycopg2.connect(connect_timeout=5, **DB_CONFIG)
+
+conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+logging.info("Bootstrap run to avoid missing first candle")
+
+df = pd.read_sql(
+    "SELECT * FROM klines_15m ORDER BY open_time DESC LIMIT 100",
+    conn
+)
+
+if not df.empty:
+    df = df.sort_values('open_time')  # Ensure data is in chronological order
+    features = compute_features(df)
+    rebuild_feature_table(conn, features)
+
+cur = conn.cursor()
+cur.execute("LISTEN kline_update;")
+
+logging.info("Listening for updates...")
 
 while True:
     select.select([conn], [], [])
@@ -179,14 +192,16 @@ while True:
         notify = conn.notifies.pop(0)
         logging.info(f"Trigger received: {notify.payload}")
 
-        df = pd.read_sql(
+        if notify.channel == 'kline_update':
+            df = pd.read_sql(
             "SELECT * FROM klines_15m ORDER BY open_time DESC LIMIT 100",
             conn
-        )
+            )
         
-        df = df.sort_values('open_time')  # Ensure data is in chronological order
+            df = df.sort_values('open_time')  # Ensure data is in chronological order
         
-        features = compute_features(df)
+            features = compute_features(df)
 
-        rebuild_feature_table(conn, features)
+            rebuild_feature_table(conn, features)
 
+        

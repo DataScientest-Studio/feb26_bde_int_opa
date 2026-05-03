@@ -93,7 +93,7 @@ def insert_kline(k, cur):
     cur.execute("""
         INSERT INTO klines_15m (symbol, open_time, open, high, low, close, volume, close_time, quote_asset_volume, trades, taker_base, taker_quote)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (open_time) DO NOTHING;
+        ON CONFLICT (open_time) DO UPDATE SET open_time = EXCLUDED.open_time;
     """, (
         k["s"],
         datetime.fromtimestamp(k["t"] / 1000, tz=timezone.utc),
@@ -108,8 +108,8 @@ def insert_kline(k, cur):
         k["V"],   
         k["Q"]    
     ))
-
-    cur.connection.commit()
+    cur.execute("NOTIFY kline_update;")  # Notify that a new kline has been inserted
+    conn.commit()
 
 
 # ---------------- BACKFILL (run once) ----------------

@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres_binance_live_data
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: binance_15m_klines_market
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_live:/var/lib/postgresql/data
+      - ./src/data/init_Live_data_SQL_DB:/docker-entrypoint-initdb.d/
+    networks:
+      - binance_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  streamer:
+    image: raedayadi/streamer_binance:v1.0 
+    container_name: binance_streamer
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres_binance_live_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_market
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net
+
+  feature_engine:
+    image:  raedayadi/feature_engine:v3.0
+    container_name: binance_feature_engine
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres_binance_live_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_market
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net
+
+  ML-prediction:
+    image: raedayadi/ml-prediction:v1.0
+    container_name: ML_prediction
+    environment:
+      DB_HOST: postgres_binance_live_data
+      DB_PORT: 5432
+      DB_NAME: binance_15m_klines_market
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - binance_net
+    depends_on:
+      feature_engine:
+        condition: service_started
+    restart: "always"
+    volumes:
+      - ./src/models:/models
+
+volumes:
+  pgdata_live:
+
+networks:
+  binance_net:
+    driver: bridge
