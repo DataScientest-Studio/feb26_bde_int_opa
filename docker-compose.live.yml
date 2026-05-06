@@ -53,8 +53,10 @@ services:
       - binance_net
 
   ML-prediction:
-    image: raedayadi/ml-prediction:v1.0
+    image: raedayadi/ml-prediction:v2.0
     container_name: ML_prediction
+    ports:
+      - "8000:8000"
     environment:
       DB_HOST: postgres_binance_live_data
       DB_PORT: 5432
@@ -66,9 +68,10 @@ services:
     depends_on:
       feature_engine:
         condition: service_started
-    restart: "always"
+    restart: "unless-stopped"
     volumes:
       - ./src/models:/models
+
 
 volumes:
   pgdata_live:

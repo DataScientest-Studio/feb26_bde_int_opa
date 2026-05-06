@@ -20,5 +20,8 @@ COPY ./src/models/ML-prediction/ /app
 # Create models directory
 RUN mkdir -p /models
 
-# Run prediction service
-CMD ["python3", "predict_model.py"]
+# Expose FastAPI port
+EXPOSE 8000
+
+# Run prediction service API
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

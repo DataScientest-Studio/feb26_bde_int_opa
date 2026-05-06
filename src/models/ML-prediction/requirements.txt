@@ -2,3 +2,5 @@ pandas
 psycopg2-binary
 joblib
 scikit-learn
+fastapi
+uvicorn[standard]
