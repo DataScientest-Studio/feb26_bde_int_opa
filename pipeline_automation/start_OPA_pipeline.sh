@@ -18,8 +18,11 @@ cd "$SCRIPT_DIR"
 
 echo "Current directory: $(pwd)"
 
-$DOCKER compose -f docker-compose.live.yml down -v
+$DOCKER compose -f docker-compose.live.yml down -v --remove-orphans
+
+# Remove stopped containers globally
+$DOCKER container prune -f
+
 $DOCKER compose -f docker-compose.live.yml up -d
 
 echo "OPA pipeline started successfully"
-
