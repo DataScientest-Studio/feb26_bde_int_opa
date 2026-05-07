@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata_live:/var/lib/postgresql/data
-      - ./src/data/init_Live_data_SQL_DB:/docker-entrypoint-initdb.d/
+      - ../src/data/init_Live_data_SQL_DB:/docker-entrypoint-initdb.d/
     networks:
       - binance_net
     healthcheck:
@@ -68,9 +68,9 @@ services:
     depends_on:
       feature_engine:
         condition: service_started
-    restart: "unless-stopped"
+    restart: "always"
     volumes:
-      - ./src/models:/models
+      - ../src/models:/models
 
 
 volumes:

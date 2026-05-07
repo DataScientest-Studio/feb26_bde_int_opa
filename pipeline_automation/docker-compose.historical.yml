@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: binance_15m_klines_historical_data
     volumes:
       - pgdata_historical:/var/lib/postgresql/data
-      - ./src/data/init_historical_data_SQL_DB:/docker-entrypoint-initdb.d/
+      - ../src/data/init_historical_data_SQL_DB:/docker-entrypoint-initdb.d/
     networks:
       - binance_net
     healthcheck:
@@ -68,7 +68,7 @@ services:
       feature-engineering:
         condition: service_completed_successfully
     volumes:
-      - ./src/models:/models
+      - ../src/models:/models
 
 volumes:
   pgdata_historical:
